@@ -1,0 +1,7 @@
+numpy
+pandas
+requests
+tqdm
+pytest
+faiss-cpu
+python-dateutil

@@ -1,0 +1,7 @@
+id,url,title,language,size_kb,tags
+r1,https://example.org/res1,Introduction to Fractions,en,120,text
+r2,https://example.org/res2,Basic Addition (Kannada),kn,90,text
+r3,https://example.org/res3,Multiplication Tricks,hi,200,video
+r4,https://example.org/res4,Basic Kannada Alphabets,kn,60,video
+r5,https://example.org/res5,Science: Plants,en,300,document
+r6,https://example.org/res6,Practice: Word Problems,en,40,text

@@ -1,0 +1,52 @@
+{
+  "student": {
+    "id": "demo_student_1",
+    "name": "Raju",
+    "grade": 6,
+    "preferred_language": "kn",
+    "weekly_bandwidth_kb": 500,
+    "available_hours_per_day": 1.0
+  },
+  "summaries": {
+    "r4": "Example content for resource r4. Contains explanation, examples, and practice tasks.",
+    "r3": "Example content for resource r3. Contains explanation, examples, and practice tasks.",
+    "r1": "Example content for resource r1. Contains explanation, examples, and practice tasks.",
+    "r6": "Example content for resource r6. Contains explanation, examples, and practice tasks.",
+    "r2": "Example content for resource r2. Contains explanation, examples, and practice tasks.",
+    "r5": "Example content for resource r5. Contains explanation, examples, and practice tasks."
+  },
+  "lessons": [
+    {
+      "resource_id": "r4",
+      "title": "Basic Kannada Alphabets",
+      "lang": "kn",
+      "estimated_kb": 60,
+      "summary": "Example content for resource r4. Contains explanation, examples, and practice tasks.",
+      "day": 1
+    },
+    {
+      "resource_id": "r2",
+      "title": "Basic Addition (Kannada)",
+      "lang": "kn",
+      "estimated_kb": 90,
+      "summary": "Example content for resource r2. Contains explanation, examples, and practice tasks.",
+      "day": 2
+    },
+    {
+      "resource_id": "r6",
+      "title": "Practice: Word Problems",
+      "lang": "en",
+      "estimated_kb": 40,
+      "summary": "Example content for resource r6. Contains explanation, examples, and practice tasks.",
+      "day": 3
+    },
+    {
+      "resource_id": "r1",
+      "title": "Introduction to Fractions",
+      "lang": "en",
+      "estimated_kb": 120,
+      "summary": "Example content for resource r1. Contains explanation, examples, and practice tasks.",
+      "day": 4
+    }
+  ]
+}
