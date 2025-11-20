@@ -1,18 +1,17 @@
 """
 Streamlit app for the REAL multi-agent reasoning demo.
 
-This app provides a friendly UI to:
-- Upload or select the sample_resources.csv manifest
-- Run ingest & summarization (uses demo_combined.run_ingest, run_summarize)
-- Build corpus and initialize OrchestratorReal
-- Ask questions to the multi-agent system and display teaching content
-- Evaluate a student's answer against an expected answer
+This is a cleaned-up two-column (40/60) layout version optimized to avoid stretching and overflow.
+- Left column: controls (narrow, scrollable)
+- Right column: outputs, corpus preview and detailed teaching view
 
-Usage: `streamlit run app.py`
+Features:
+- Robust import fallback to MOCK mode
+- Load manifest CSV or use embedded sample resources (with local image paths)
+- Corpus preview with optional image thumbnails (uses local file paths when present)
+- Proper session-state usage and balanced 40/60 layout
 
-If your environment doesn't expose the `src/` package layout, this app will try to add `src/` to sys.path.
-If imports fail, the app shows helpful error messages and offers to run in "mock" mode so you can still try the UI.
-
+Run: streamlit run app.py
 """
 
 import os
@@ -24,7 +23,7 @@ from typing import List
 import pandas as pd
 import streamlit as st
 
-# ensure src/ is importable (same logic as original script)
+# ensure src/ is importable
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
@@ -33,23 +32,24 @@ if SRC not in sys.path:
 logger = logging.getLogger("streamlit_real_agents")
 logging.basicConfig(level=logging.INFO)
 
-# Attempt imports from your package. If they fail, provide a clear message and mock fallbacks.
 USE_MOCK = False
 try:
     from multi_agent_real import OrchestratorReal
     from demo_combined import run_ingest, run_summarize
 except Exception as e:
-    # Import failed — switch to mock behavior so the UI remains usable for testing
     logger.exception("Failed to import project modules: %s", e)
     USE_MOCK = True
 
-    # Mock implementations (minimal, safe to run) -------------------------------------------------
+    # Local file URLs (images uploaded in the session) — developer provided paths
+    SAMPLE_IMAGE_1 = "/mnt/data/af86c628-12c0-410b-b0d6-59ce9f87d5f8.png"
+    SAMPLE_IMAGE_2 = "/mnt/data/5d88c9b3-8270-4492-b788-0475c1a1bd74.png"
+    SAMPLE_IMAGE_3 = "/mnt/data/6fcf2d31-69c6-437c-88ee-7a89bfa9d798.png"
+
     class OrchestratorReal:
         def __init__(self, corpus):
             self.corpus = corpus
 
         def handle_user_question(self, session_id, user_question, student_profile=None):
-            # very simple mock response for UI testing
             return {
                 "answer": f"(MOCK) Short answer to: {user_question}",
                 "teaching": {
@@ -68,25 +68,21 @@ except Exception as e:
             }
 
     def run_ingest(manifest_path: str) -> List[dict]:
-        # If a CSV exists, try to load; else return a small sample list
-        if os.path.exists(manifest_path):
+        # If CSV exists, load it. Otherwise return a small sample with local image URLs provided by developer.
+        if manifest_path and os.path.exists(manifest_path) and manifest_path.lower().endswith('.csv'):
             df = pd.read_csv(manifest_path)
-            records = df.fillna("").to_dict(orient="records")
-            # expected fields: id,title,tags,url,size_kb
-            return records
-        else:
-            # sample resources
-            return [
-                {"id": "r1", "title": "Fractions Intro", "tags": "math", "url": "", "size_kb": 12},
-                {"id": "r2", "title": "Addition Basics", "tags": "math", "url": "", "size_kb": 8},
-            ]
+            return df.fillna("").to_dict(orient="records")
+        # fallback sample resources — note the 'url' fields use local paths that your environment can transform.
+        return [
+            {"id": "r1", "title": "Fractions Intro", "tags": "math", "url": SAMPLE_IMAGE_1, "size_kb": 12},
+            {"id": "r2", "title": "Addition Basics", "tags": "math", "url": SAMPLE_IMAGE_2, "size_kb": 8},
+            {"id": "r3", "title": "Kannada Alphabets", "tags": "language", "url": SAMPLE_IMAGE_3, "size_kb": 15},
+        ]
 
     def run_summarize(resources, provider="mock", mode="short"):
-        # return a mapping id->short summary
         return {r.get("id"): f"(MOCK) Summary for {r.get('title', r.get('id'))}" for r in resources}
-    # ----------------------------------------------------------------------------------------------
 
-# ---------------------- Streamlit UI helpers -----------------------------------------------------
+# Helpers
 
 def build_corpus_from_resources(resources, summaries):
     corpus = {}
@@ -109,26 +105,20 @@ def ensure_state_key(key, default=None):
         st.session_state[key] = default
 
 
-# ---------------------- Streamlit layout ---------------------------------------------------------
-
+# App layout
 st.set_page_config(page_title="REAL Multi-Agent Demo", layout="wide")
 st.title("REAL multi-agent reasoning — Streamlit demo")
 
-col1, col2 = st.columns([1, 2])
+# Two-column balanced layout: controls (40%) | output (60%)
+col_left, col_right = st.columns([0.4, 0.6])
 
-with col1:
+with col_left:
     st.header("Controls")
-
     manifest_file = st.file_uploader("Upload manifest CSV (optional)", type=["csv"])
     use_sample_button = st.button("Load default sample_resources.csv from data/ (if present)")
-
     manifest_path_input = st.text_input("Or enter manifest path on server", value=os.path.join("data", "sample_resources.csv"))
 
-    if 'last_manifest' not in st.session_state:
-        st.session_state['last_manifest'] = None
-
     if manifest_file is not None:
-        # save uploaded csv to a temporary file in the working directory so run_ingest can read it
         tmp_path = os.path.join(".", "uploaded_manifest.csv")
         with open(tmp_path, "wb") as f:
             f.write(manifest_file.getbuffer())
@@ -140,7 +130,7 @@ with col1:
             st.session_state['last_manifest'] = manifest_path_input
             st.success(f"Using manifest: {manifest_path_input}")
         else:
-            st.warning(f"{manifest_path_input} not found on server. The demo will use a mocked sample if imports fail.")
+            st.warning(f"{manifest_path_input} not found on server. Using embedded sample resources.")
 
     st.markdown("---")
     run_ingest_btn = st.button("Run ingest & summarize")
@@ -148,7 +138,6 @@ with col1:
     st.markdown("### Orchestrator settings")
     session_id = st.text_input("Session ID", value="student_demo_session")
     grade = st.number_input("Student grade", min_value=1, max_value=12, value=6)
-
     init_orch_btn = st.button("Initialize Orchestrator")
 
     st.markdown("---")
@@ -156,7 +145,8 @@ with col1:
     ask_input = st.text_input("Ask a question (single)")
     ask_btn = st.button("Ask question")
 
-    question_list = st.text_area("Ask multiple questions (one per line)", value="what are fractions?\nwhat is addition?")
+    question_list = st.text_area("Ask multiple questions (one per line)", value="what are fractions?
+what is addition?")
     ask_batch_btn = st.button("Ask questions (batch)")
 
     st.markdown("---")
@@ -165,7 +155,7 @@ with col1:
     student_ans = st.text_input("Student answer to evaluate", value="Fractions are parts of a whole.")
     eval_btn = st.button("Evaluate student answer")
 
-with col2:
+with col_right:
     st.header("Output")
 
     ensure_state_key("resources", [])
@@ -173,7 +163,7 @@ with col2:
     ensure_state_key("corpus", {})
     ensure_state_key("orch", None)
 
-    # Run ingest & summarize
+    # Ingest & summarize
     if run_ingest_btn:
         manifest_to_use = st.session_state.get('last_manifest') or manifest_path_input
         st.info(f"Ingesting from: {manifest_to_use}")
@@ -187,7 +177,7 @@ with col2:
             st.success("Ingest and summarization completed.")
         except Exception as e:
             st.exception(e)
-            st.error("Ingest or summarization failed. If you're running this in a different working dir, make sure src/ is on PYTHONPATH and that data/sample_resources.csv exists.")
+            st.error("Ingest or summarization failed. Ensure src/ is on PYTHONPATH and data/sample_resources.csv exists.")
 
     # Initialize orchestrator
     if init_orch_btn:
@@ -215,13 +205,12 @@ with col2:
             st.success("Orchestrator initialized.")
         except Exception as e:
             st.exception(e)
-            st.error("Failed to initialize OrchestratorReal. Check imports and paths. Using mock orchestrator instead.")
+            st.error("Failed to initialize OrchestratorReal. Using mock orchestrator instead.")
             st.session_state['orch'] = OrchestratorReal(corpus)
 
-    # Display corpus
+    # Corpus preview (table + thumbnails)
     if st.session_state['corpus']:
         st.subheader("Corpus preview")
-        # show as dataframe with id,title,tags,size
         rows = []
         for rid, item in st.session_state['corpus'].items():
             rows.append({
@@ -234,7 +223,23 @@ with col2:
         df = pd.DataFrame(rows)
         st.dataframe(df)
 
-    # Handle single question
+        # thumbnails
+        st.subheader("Thumbnails (if available)")
+        thumb_cols = st.columns(3)
+        i = 0
+        for rid, item in st.session_state['corpus'].items():
+            url = item.get('meta', {}).get('url')
+            with thumb_cols[i % 3]:
+                st.markdown(f"**{item.get('title')}**")
+                if url and os.path.exists(url):
+                    st.image(url, use_column_width=True)
+                elif url:
+                    st.write(f"URL: {url}")
+                else:
+                    st.write("(no image)")
+            i += 1
+
+    # Single question handling
     if ask_btn and ask_input.strip():
         orch = st.session_state.get('orch')
         if orch is None:
@@ -255,7 +260,7 @@ with col2:
         for p in response.get('teaching', {}).get('practice', []):
             st.write(f"Q: {p.get('q')} — Expected: {p.get('a')}")
 
-    # Handle batch questions
+    # Batch questions
     if ask_batch_btn:
         qs = [q.strip() for q in question_list.splitlines() if q.strip()]
         orch = st.session_state.get('orch')
@@ -292,17 +297,16 @@ with col2:
         st.write(f"Feedback: {feedback.get('feedback')}")
 
     st.markdown("---")
-    st.markdown("### Misc")
     if st.button("Download current corpus as JSON"):
         corpus = st.session_state.get('corpus', {})
         st.download_button("Download corpus JSON", data=json.dumps(corpus, indent=2), file_name="corpus.json")
 
     if USE_MOCK:
-        st.warning("The app is running in MOCK mode because imports from your project failed. This lets you test the UI even if your package isn't importable from this path.")
-        st.info("To run with your real code, ensure `src/` contains modules `multi_agent_real.py` and `demo_combined.py` and that `data/sample_resources.csv` exists (or upload a manifest CSV).")
+        st.warning("Running in MOCK mode because imports failed. To use your real modules, ensure src/multi_agent_real.py and src/demo_combined.py exist.")
 
+# Sidebar help
 st.sidebar.markdown("---")
-st.sidebar.write("Developed to run the REAL multi-agent demo inside Streamlit.\n\nRun: `streamlit run app.py`")
+st.sidebar.write("Developed to run the REAL multi-agent demo inside Streamlit.
 
-# Footer / quick tips
-st.caption("If you get an ImportError for multi_agent_real or demo_combined, check that this script is placed at the project root and that `src/` contains your source modules.")
+Run: `streamlit run app.py`")
+st.caption("This layout uses a fixed 40/60 columns ratio to avoid stretching and improve readability.")
