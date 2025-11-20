@@ -1,137 +1,67 @@
+# app.py
 """
-run_real_agents.py
-Real multi-agent reasoning demo.
+Streamlit UI for the run_real_agents multi-agent demo.
 
-This script:
-1. Loads resources from sample_resources.csv
-2. Generates summaries using your existing summarizer
-3. Builds a corpus for retrieval
-4. Runs the REAL multi-agent system (Retriever + QA + Tutor + Feedback)
+Run with:
+    streamlit run app.py
+or:
+    python -m streamlit run app.py
 """
 
-import os
+import streamlit as st
 import sys
+import os
 import logging
+from typing import Dict, Any
 
-# ------------------------------------------------------------------
-# 1) Ensure src/ is importable
-# ------------------------------------------------------------------
+st.set_page_config(page_title="Rural Education Agent — Multi-Agent Demo", layout="wide")
 
+# ensure src/ is importable
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, "src")
-
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
 
-# ------------------------------------------------------------------
-# 2) Imports from src/
-# ------------------------------------------------------------------
+# Debug info
+st.sidebar.markdown("**Project Root:** `%s`" % ROOT)
+st.sidebar.markdown("**src path:** `%s`" % SRC)
 
-from multi_agent_real import OrchestratorReal
-from demo_combined import run_ingest, run_summarize   # reuse existing functions
+# Logger
+logger = logging.getLogger("streamlit_app")
+logger.setLevel(logging.INFO)
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("run_real_agents")
+# Importing main modules
+try:
+    from multi_agent_real import OrchestratorReal
+except Exception as e:
+    st.error("Missing file: src/multi_agent_real.py (required for OrchestratorReal)")
+    st.exception(e)
+    st.stop()
 
-
-# ------------------------------------------------------------------
-# 3) Load resources & summaries
-# ------------------------------------------------------------------
-
-manifest_path = os.path.join("data", "sample_resources.csv")
-
-logger.info("Loading resources...")
-resources = run_ingest(manifest_path)
-
-logger.info("Generating summaries...")
-summaries = run_summarize(resources, provider="mock", mode="short")
-
-
-# ------------------------------------------------------------------
-# 4) Build corpus for multi-agent system
-# ------------------------------------------------------------------
-
-logger.info("Building corpus for multi-agent agents...")
-
-corpus = {}
-for r in resources:
-    rid = r["id"]
-    corpus[rid] = {
-        "title": r.get("title", ""),
-        "tags": r.get("tags", ""),
-        "summary": summaries.get(rid, ""),
-        "meta": {
-            "url": r.get("url"),
-            "size_kb": r.get("size_kb", 0)
-        }
-    }
+try:
+    from demo_combined import run_ingest, run_summarize
+except Exception as e:
+    st.error("Missing file: demo_combined.py (must contain run_ingest & run_summarize)")
+    st.exception(e)
+    st.stop()
 
 
-# ------------------------------------------------------------------
-# 5) Initialize OrchestratorReal
-# ------------------------------------------------------------------
+# ==================  SIDEBAR  ==================
+st.sidebar.header("Options & Settings")
 
-orch = OrchestratorReal(corpus)
-session_id = "student_demo_session"
+manifest_path = st.sidebar.text_input("Resource CSV path:", "data/sample_resources.csv")
+generate_on_start = st.sidebar.checkbox("Auto-generate summaries on load", True)
+top_k = st.sidebar.number_input("Retriever top_k", 1, 10, 5)
 
-logger.info("Orchestrator initialized. Starting Q&A...")
+st.sidebar.markdown("---")
+session_id = st.sidebar.text_input("Session ID", "student_demo_session")
+grade = st.sidebar.number_input("Student grade", 1, 12, 6)
 
-# ------------------------------------------------------------------
-# 6) Ask questions to the multi-agent system
-# ------------------------------------------------------------------
-
-questions = [
-    "what are fractions?",
-    "what is addition?",
-    "explain kannada alphabets",
-    "what are plants?"
-]
-
-for q in questions:
-    print("\n" + "=" * 70)
-    print("USER QUESTION:", q)
-
-    response = orch.handle_user_question(
-        session_id=session_id,
-        user_question=q,
-        student_profile={"grade": 6}
-    )
-
-    print("\nAnswer:")
-    print(response["answer"])
-
-    print("\nExplanation:")
-    print(response["teaching"]["explanation"])
-
-    print("\nExamples:")
-    for ex in response["teaching"]["examples"]:
-        print(" -", ex)
-
-    print("\nPractice Questions:")
-    for p in response["teaching"]["practice"]:
-        print(" -", p["q"], "| Expected:", p["a"])
+st.sidebar.markdown("---")
+show_corpus = st.sidebar.checkbox("Show Corpus")
+show_summaries = st.sidebar.checkbox("Show Summaries")
 
 
-# ------------------------------------------------------------------
-# 7) Feedback Evaluation Example
-# ------------------------------------------------------------------
-
-print("\n" + "=" * 70)
-print("NOW TESTING STUDENT ANSWER EVALUATION")
-
-student_ans = "Fractions are parts of a whole."
-expected_ans = "Fractions represent parts of a whole number."
-
-feedback = orch.assess_student_answer(
-    session_id=session_id,
-    student_answer=student_ans,
-    expected_answer=expected_ans
-)
-
-print("\nStudent Answer:", student_ans)
-print("Expected:", expected_ans)
-print("Score:", feedback["score"])
-print("Correct:", feedback["correct"])
-print("Feedback:", feedback["feedback"])
-
-print("\nDONE! Multi-agent reasoning demo finished successfully.")
+# ================== LOAD RESOURCES ==================
+st.title("🌾 Rural Education Agent — Multi-Agent Reasoning (Streamlit)")
+st.subheader("1
